@@ -126,7 +126,7 @@ function tabsFor(){ return [['home', '⌂ Start']].concat(state.mode === 'tb' ? 
 function renderTabs(){
   const todo = state.mode === 'tb' && state.companies.length ? totalTodo() : 0;
   const L = state.ledger;
-  const exp = ui.tab !== 'home' ? `<div class="exp"><span class="muted small">Export report</span><button class="btn sm" data-act="exp" data-f="xlsx" title="Excel workbook">⬇ Excel</button><button class="btn sm" data-act="exp" data-f="pdf" title="Opens the print dialog – choose “Save as PDF”">⬇ PDF</button></div>` : '';
+  const exp = ui.tab !== 'home' ? `<div class="exp"><span class="muted small">Export report</span><button class="btn sm" data-act="exp" data-f="xlsx" title="Excel workbook">⬇ Excel</button><button class="btn sm" data-act="pack" title="Every step in one Excel workbook">⬇ Complete pack</button><button class="btn sm" data-act="exp" data-f="pdf" title="Opens the print dialog – choose “Save as PDF”">⬇ PDF</button></div>` : '';
   $('#tabs').innerHTML = tabsFor().map(([k, t]) => {
     let b = '';
     if (k === 'tb' && state.companies.length) b = `<span class="badge ok">${state.companies.length}</span>`;

@@ -1527,7 +1527,7 @@ function tabsFor(){ return [['home', '⌂ Start']].concat(state.mode === 'tb' ? 
 function renderTabs(){
   const todo = state.mode === 'tb' && state.companies.length ? totalTodo() : 0;
   const L = state.ledger;
-  const exp = ui.tab !== 'home' ? `<div class="exp"><span class="muted small">Export report</span><button class="btn sm" data-act="exp" data-f="xlsx" title="Excel workbook">⬇ Excel</button><button class="btn sm" data-act="exp" data-f="pdf" title="Opens the print dialog – choose “Save as PDF”">⬇ PDF</button></div>` : '';
+  const exp = ui.tab !== 'home' ? `<div class="exp"><span class="muted small">Export report</span><button class="btn sm" data-act="exp" data-f="xlsx" title="Excel workbook">⬇ Excel</button><button class="btn sm" data-act="pack" title="Every step in one Excel workbook">⬇ Complete pack</button><button class="btn sm" data-act="exp" data-f="pdf" title="Opens the print dialog – choose “Save as PDF”">⬇ PDF</button></div>` : '';
   $('#tabs').innerHTML = tabsFor().map(([k, t]) => {
     let b = '';
     if (k === 'tb' && state.companies.length) b = `<span class="badge ok">${state.companies.length}</span>`;
@@ -2140,6 +2140,7 @@ const L_PRESETS = {
   statement: { icon: '🧾', name: 'Statement vs ledger account', desc: 'A supplier’s or customer’s statement against your own ledger account for them – find what is missing, wrong or timing.', labels: ['Their statement', 'Our ledger account'], mirror: true, tag: 'Invoices on their statement ↔ invoices in your ledger' },
   customers: { icon: '👥', name: 'Two customers’ general ledgers', desc: 'The same trading relationship as it appears in two customers’ (or two parties’) general ledgers.', labels: ['Customer 1 general ledger', 'Customer 2 general ledger'], mirror: true, tag: 'One side’s debit is the other side’s credit' },
   gl: { icon: '⇄', name: 'Two general ledgers', desc: 'Any two ledger accounts that should agree – intercompany accounts, control accounts, a bank statement against the cash book.', labels: ['General ledger A', 'General ledger B'], mirror: true, tag: 'Choose “opposite” or “same” direction' },
+  bank: { icon: '🏦', name: 'Bank reconciliation', desc: 'A bank statement against your cash book – find unpresented items, deposits in transit, bank charges and errors. Dates are allowed to differ by a few days.', labels: ['Bank statement', 'Cash book'], mirror: true, tag: 'Bank credit ↔ cash book receipt', days: 7 },
   custom: { icon: '⚙', name: 'Custom comparison', desc: 'Load two lists of transactions and set the matching direction and rules yourself.', labels: ['List A', 'List B'], mirror: false, tag: 'Full control' }
 };
 const fmtD = d => d ? fmtDate(d, 'dmy') : '';
@@ -2150,7 +2151,7 @@ function ledgerStats(items){
 function applyPreset(k){
   const L = state.ledger, p = L_PRESETS[k] || L_PRESETS.statement;
   const defaults = new Set(Object.values(L_PRESETS).flatMap(x => x.labels));
-  L.preset = k; L.mirror = p.mirror;
+  L.preset = k; L.mirror = p.mirror; if (p.days && !L.A.items.length && !L.B.items.length) L.opts.days = p.days;
   if (!L.A.label || defaults.has(L.A.label)) L.A.label = p.labels[0];
   if (!L.B.label || defaults.has(L.B.label)) L.B.label = p.labels[1];
 }
@@ -2168,7 +2169,7 @@ function homeView(){
     <div class="lbl" style="margin-bottom:8px">Group of companies</div>
     <div class="optgrid" style="margin-bottom:22px">${card('tb', 'Σ', 'Intercompany loan accounts', 'Paste or import the trial balance of each company in a group. Every loan account is matched to the company on the other side, differences are shown and the interest journals can be exported.', 'Any number of companies · trial balances')}</div>
     <div class="lbl" style="margin-bottom:8px">Two ledgers or statements</div>
-    <div class="optgrid">${['statement', 'customers', 'gl', 'custom'].map(k => card(k, L_PRESETS[k].icon, L_PRESETS[k].name, L_PRESETS[k].desc, L_PRESETS[k].tag)).join('')}</div>
+    <div class="optgrid">${['statement', 'bank', 'customers', 'gl', 'custom'].map(k => card(k, L_PRESETS[k].icon, L_PRESETS[k].name, L_PRESETS[k].desc, L_PRESETS[k].tag)).join('')}</div>
     <p class="small muted" style="margin-top:22px">Everything stays on your computer – nothing is uploaded. Every step has an <b>Export report</b> button (Excel or PDF).</p>${memCardHTML()}<p class="small muted" style="margin-top:14px">New here? <a href="#" data-act="sample" data-kind="tb">Try it with a sample group of companies</a> · <a href="#" data-act="sample" data-kind="ledger">Try it with a sample statement and ledger</a> · <a href="#" data-act="about">About &amp; shortcuts</a> · v${APP_VERSION}</p>`;
 }
 
@@ -2428,6 +2429,29 @@ function exportReport(f){
     audit('Excel report exported: ' + R.title); toast('Excel report downloaded');
   } else { audit('PDF report prepared: ' + R.title); preparePrint(R, true); }
 }
+/* One workbook with every step: the “group pack” */
+function exportPack(){
+  const keep = ui.tab, sheets = [], seen = new Set();
+  const steps = state.mode === 'tb' ? [['tb', 'Cos'], ['recon', 'Recon'], ['review', 'Review'], ['fix', 'Fix'], ['jnl', 'Jnl']] : [['lload', 'Lists'], ['lres', 'Rec']];
+  let title = '', sub = '';
+  try {
+    steps.forEach(([tab, pre]) => {
+      ui.tab = tab; if (tab === 'review') ui.review.filter = 'all';
+      let R; try { R = getReport(); } catch (e) { R = null; }
+      if (!R) return; title = title || R.title; sub = sub || R.sub;
+      R.sections.filter(s => !s.pdfOnly).forEach(s => {
+        let n = (pre + ' ' + s.name).slice(0, 31), k = 2; while (seen.has(n.toLowerCase())) n = (pre + ' ' + s.name).slice(0, 28) + ' ' + k++;
+        seen.add(n.toLowerCase());
+        sheets.push({ name: n, title: R.title + ' – ' + (s.title || s.name), subtitle: R.sub, head: s.head, rows: s.rows, money: s.money, total: s.total, tone: s.tone });
+      });
+    });
+  } finally { ui.tab = keep; }
+  if (!sheets.length){ toast('Nothing to export yet – load some data first.'); return; }
+  sheets.unshift(coverSheet({ title: 'Complete pack', sub, file: 'Pack', sections: sheets.map(s => ({ name: s.name, rows: s.rows })) }));
+  if (state.audit.length) sheets.push({ name: 'Audit trail', title: 'Audit trail', subtitle: sub, head: ['When', 'What'], rows: state.audit.map(e => [e.t.slice(0, 10) + ' ' + e.t.slice(11, 19), e.m]) });
+  download(`Matchmaker - Complete pack ${new Date().toISOString().slice(0, 10)}.xlsx`, makeXlsx(sheets));
+  audit('Complete pack exported (' + sheets.length + ' sheets)'); toast('Complete pack downloaded');
+}
 function preparePrint(R, doPrint){
   let pa = $('#printarea'); if (!pa){ pa = document.createElement('div'); pa.id = 'printarea'; document.body.appendChild(pa); }
   pa.innerHTML = reportHTML(R); document.body.classList.add('print-report');
@@ -2447,6 +2471,7 @@ document.addEventListener('click', e => {
   }
   else if (a === 'cont'){ state.mode = d.mode; ui.tab = d.mode === 'tb' ? 'recon' : (L.A.items.length && L.B.items.length ? 'lres' : 'lload'); dirty(); render(); }
   else if (a === 'exp') exportReport(d.f);
+  else if (a === 'pack') exportPack();
   else if (a === 'lclear'){ delete ui.lraw[d.side]; L[d.side].items = []; L[d.side].skipped = 0; L.manual = []; L.rejected = []; dirty(); render(); }
   else if (a === 'lfile'){ ui.lfileSide = d.side; $('#fileLedger').click(); }
   else if (a === 'lgo'){ ui.tab = 'lres'; ui.lsub = 'sum'; render(); window.scrollTo(0, 0); }
@@ -3048,7 +3073,7 @@ document.addEventListener('change', e => {
 });
 
 /* ---------- sample data + about ---------- */
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 const SAMPLE_TB = [
 `Alpha Trading (Pty) Ltd
 Trial Balance : 01/03/2024 to 28/02/2025
