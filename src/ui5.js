@@ -165,7 +165,7 @@ document.addEventListener('change', e => {
 });
 
 /* ---------- sample data + about ---------- */
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const SAMPLE_TB = [
 `Alpha Trading (Pty) Ltd
 Trial Balance : 01/03/2024 to 28/02/2025

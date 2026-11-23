@@ -3,13 +3,13 @@
 Match intercompany loans across any number of entities' trial balances, reconcile ledgers and statements, and export journals (including your own custom CSV/Excel layouts) for your accounting software. Runs 100% offline – nothing is uploaded.
 
 ## Use it
-- **Windows app:** download `dist/Matchmaker.exe` and double-click. It opens Matchmaker in its own window (needs Microsoft Edge or Google Chrome, already on most PCs). Windows SmartScreen may warn because the file is unsigned – choose *More info → Run anyway*.
+- **Windows installer:** download `dist/Matchmaker-Setup.exe` and run it (installs for your user, adds Start-menu and optional desktop shortcuts, and an uninstall entry in Windows Settings). `dist/Matchmaker.exe` is the same app without installing.
+- **Windows app (no install):** download `dist/Matchmaker.exe` and double-click. It opens Matchmaker in its own window (needs Microsoft Edge or Google Chrome, already on most PCs). Windows SmartScreen may warn because the file is unsigned – choose *More info → Run anyway*.
 - **Any computer:** open `dist/Matchmaker.html` in a browser.
 
 ## Build
 ```
-python3 build.py                     # src/ -> dist/Matchmaker.html (+ launcher copy)
-cd launcher && GOOS=windows GOARCH=amd64 go build -ldflags "-s -w -H=windowsgui" -o ../dist/Matchmaker.exe .
+./build_all.sh                       # needs Go + Python: builds dist/Matchmaker.exe and dist/Matchmaker-Setup.exe
 ```
 A GitHub Action (`.github/workflows/build.yml`) rebuilds both on every push.
 

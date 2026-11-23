@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Matchmaker – match &amp; reconcile loans, ledgers and statements</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2064%2064%22%20width%3D%22256%22%20height%3D%22256%22%20role%3D%22img%22%20aria-label%3D%22Matchmaker%20logo%22%3E%20%20%3Cdefs%3E%20%20%20%20%3ClinearGradient%20id%3D%22mmg%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%221%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%232a8a6a%22/%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%2314503d%22/%3E%3C/linearGradient%3E%20%20%20%20%3CclipPath%20id%3D%22mmc%22%3E%3Ccircle%20cx%3D%2224%22%20cy%3D%2232%22%20r%3D%2214%22/%3E%3C/clipPath%3E%20%20%3C/defs%3E%20%20%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2215%22%20fill%3D%22url%28%23mmg%29%22/%3E%20%20%3Ccircle%20cx%3D%2224%22%20cy%3D%2232%22%20r%3D%2214%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%223.4%22/%3E%20%20%3Ccircle%20cx%3D%2240%22%20cy%3D%2232%22%20r%3D%2214%22%20fill%3D%22%23f4b942%22%20fill-opacity%3D%22.0%22%20stroke%3D%22%23fff%22%20stroke-width%3D%223.4%22/%3E%20%20%3Ccircle%20cx%3D%2240%22%20cy%3D%2232%22%20r%3D%2214%22%20fill%3D%22%23f4b942%22%20clip-path%3D%22url%28%23mmc%29%22/%3E%20%20%3Cpath%20d%3D%22M26.2%2032.4l4.2%204.2%207.6-8.6%22%20fill%3D%22none%22%20stroke%3D%22%2314503d%22%20stroke-width%3D%223.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E">
-<script>try{var _t=JSON.parse(localStorage.getItem("matchmaker.theme")||"{}"),d=document.documentElement,L=_t.look||(_t.mode==="dark"?"dark":_t.mode==="light"?(_t.bg==="white"?"white":"tint"):"auto");if(_t.theme)d.dataset.theme=_t.theme;if(L==="dark")d.dataset.mode="dark";else if(L==="tint"||L==="white")d.dataset.mode="light";if(L==="white")d.dataset.bg="white"}catch(e){}</script>
+<script>try{var _t=JSON.parse(localStorage.getItem("matchmaker.theme")||"{}"),d=document.documentElement,L=_t.look||(_t.mode==="dark"?"dark":_t.mode==="light"?(_t.bg==="white"?"white":"tint"):"auto");if(_t.theme)d.dataset.theme=_t.theme;if(_t.size&&_t.size!=="m")d.dataset.size=_t.size;if(L==="dark")d.dataset.mode="dark";else if(L==="tint"||L==="white")d.dataset.mode="light";if(L==="white")d.dataset.bg="white"}catch(e){}</script>
 <style>
 :root{
   --bg:#f5f3ee; --panel:#ffffff; --ink:#1c2420; --muted:#68726b; --line:#e4e0d5; --soft:#faf9f5;
@@ -238,6 +238,20 @@ tr.cur td:not(:first-child){box-shadow:none}
 :root[data-theme="graphite"][data-mode="dark"]{--accent:#a9b6c3;--accent-2:#232a30;--accent-ink:#0e1317;--bg:#14171a}
 @media (prefers-color-scheme:dark){:root[data-theme="rose"]:not([data-mode="light"]){--accent:#ee8aa8;--accent-2:#33202a;--accent-ink:#1e0a12;--bg:#1a1417}}
 :root[data-theme="rose"][data-mode="dark"]{--accent:#ee8aa8;--accent-2:#33202a;--accent-ink:#1e0a12;--bg:#1a1417}
+:root[data-theme="teal"]{--accent:#0f766e;--accent-2:#e0f2f1;--bg:#f0f5f4;--lg1:#14b8a6;--lg2:#0b4f4a}
+@media (prefers-color-scheme:dark){:root[data-theme="teal"]:not([data-mode="light"]){--accent:#5fd4c8;--accent-2:#17302d;--accent-ink:#0a1a18;--bg:#121817}}
+:root[data-theme="teal"][data-mode="dark"]{--accent:#5fd4c8;--accent-2:#17302d;--accent-ink:#0a1a18;--bg:#121817}
+:root[data-theme="indigo"]{--accent:#4338ca;--accent-2:#e9e8fb;--bg:#f3f3f9;--lg1:#6366f1;--lg2:#2a2288}
+@media (prefers-color-scheme:dark){:root[data-theme="indigo"]:not([data-mode="light"]){--accent:#a5a8ff;--accent-2:#23244a;--accent-ink:#0d0e24;--bg:#14151f}}
+:root[data-theme="indigo"][data-mode="dark"]{--accent:#a5a8ff;--accent-2:#23244a;--accent-ink:#0d0e24;--bg:#14151f}
+:root[data-theme="sand"]{--accent:#8a6a1f;--accent-2:#f5ecd5;--bg:#f7f4ec;--lg1:#c19a3b;--lg2:#5c4510}
+@media (prefers-color-scheme:dark){:root[data-theme="sand"]:not([data-mode="light"]){--accent:#e2bd62;--accent-2:#322b16;--accent-ink:#1c1606;--bg:#18160f}}
+:root[data-theme="sand"][data-mode="dark"]{--accent:#e2bd62;--accent-2:#322b16;--accent-ink:#1c1606;--bg:#18160f}
+:root[data-theme="crimson"]{--accent:#b3211f;--accent-2:#fbe6e5;--bg:#f8f1f1;--lg1:#dc4a47;--lg2:#721210}
+@media (prefers-color-scheme:dark){:root[data-theme="crimson"]:not([data-mode="light"]){--accent:#ff8e8a;--accent-2:#3a1e1e;--accent-ink:#240a0a;--bg:#1a1414}}
+:root[data-theme="crimson"][data-mode="dark"]{--accent:#ff8e8a;--accent-2:#3a1e1e;--accent-ink:#240a0a;--bg:#1a1414}
+html[data-size="s"]{zoom:.9}html[data-size="l"]{zoom:1.15}html[data-size="xl"]{zoom:1.3}
+.themebar{flex-wrap:wrap;justify-content:flex-end}
 .themebar{display:flex;gap:5px;align-items:center;margin-left:4px}
 .themebar .sw{width:18px;height:18px;border-radius:50%;border:2px solid var(--panel);box-shadow:0 0 0 1px var(--line);cursor:pointer;padding:0}
 .themebar .sw.on{box-shadow:0 0 0 2px var(--ink)}
@@ -249,6 +263,8 @@ tr.cur td:not(:first-child){box-shadow:none}
 dialog.wide{max-width:min(1240px,97vw)}dialog .db select,dialog .db input[type=text],dialog .db input[type=number]{min-width:0}
 .ocrt td{padding:2px 3px}.ocin{width:100%;min-width:90px;padding:4px 6px;font:inherit;font-size:12.5px;border:1px solid var(--line);border-radius:4px;background:var(--card);color:var(--ink)}
 .ocin.lowc{background:var(--warn-bg);border-color:var(--warn)}
+.themebar .md{width:auto;flex:0 0 auto;min-width:0}.themebar{max-width:100%}
+.card.pad>table.t,.db>table.t{display:block;overflow-x:auto;max-width:100%}
 
 </style>
 </head>
@@ -3091,7 +3107,7 @@ document.addEventListener('change', e => {
 });
 
 /* ---------- sample data + about ---------- */
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const SAMPLE_TB = [
 `Alpha Trading (Pty) Ltd
 Trial Balance : 01/03/2024 to 28/02/2025
@@ -3306,15 +3322,16 @@ document.addEventListener('click', e => {
 
 { const bl = document.getElementById('brandlogo'); if (bl) bl.innerHTML = LOGO; }
 {
-  const THEMES = [["forest","Forest","#1d6b52"],["ocean","Ocean","#1f5f9e"],["plum","Plum","#7a3b8f"],["ember","Ember","#c2571a"],["graphite","Graphite","#3b4651"],["rose","Rose","#b4325a"]], root = document.documentElement, LOOKS = [['auto', 'Match my device'], ['tint', 'Light – soft tint'], ['white', 'Light – plain white'], ['dark', 'Dark']];
+  const THEMES = [["forest","Forest","#1d6b52"],["ocean","Ocean","#1f5f9e"],["plum","Plum","#7a3b8f"],["ember","Ember","#c2571a"],["graphite","Graphite","#3b4651"],["rose","Rose","#b4325a"],["teal","Teal","#0f766e"],["indigo","Indigo","#4338ca"],["sand","Sand","#8a6a1f"],["crimson","Crimson","#b3211f"]], SIZES = [["s","Text: Small"],["m","Text: Normal"],["l","Text: Large"],["xl","Text: Extra large"]], root = document.documentElement, LOOKS = [['auto', 'Match my device'], ['tint', 'Light – soft tint'], ['white', 'Light – plain white'], ['dark', 'Dark']];
   let saved = {}; try { saved = JSON.parse(localStorage.getItem('matchmaker.theme') || '{}'); } catch (e) {}
-  let cur = { theme: root.dataset.theme || 'forest', look: saved.look || (saved.mode === 'dark' ? 'dark' : saved.mode === 'light' ? (saved.bg === 'white' ? 'white' : 'tint') : 'auto') };
+  let cur = { theme: root.dataset.theme || 'forest', size: saved.size || 'm', look: saved.look || (saved.mode === 'dark' ? 'dark' : saved.mode === 'light' ? (saved.bg === 'white' ? 'white' : 'tint') : 'auto') };
   const draw = () => {
     $('#themebar').innerHTML = THEMES.map(([k, n, c]) => `<button class="sw ${cur.theme === k ? 'on' : ''}" style="background:${c}" data-theme="${k}" title="${n} colour scheme"></button>`).join('')
-      + `<select class="md" data-look title="Page background">${LOOKS.map(([k, n]) => `<option value="${k}" ${cur.look === k ? 'selected' : ''}>${n}</option>`).join('')}</select>`;
+      + `<select class="md" data-size title="Text size">${SIZES.map(([k, n]) => `<option value="${k}" ${cur.size === k ? 'selected' : ''}>${n}</option>`).join('')}</select><select class="md" data-look title="Page background">${LOOKS.map(([k, n]) => `<option value="${k}" ${cur.look === k ? 'selected' : ''}>${n}</option>`).join('')}</select>`;
   };
   const apply = () => {
     if (cur.theme === 'forest') delete root.dataset.theme; else root.dataset.theme = cur.theme;
+    if (cur.size === 'm') delete root.dataset.size; else root.dataset.size = cur.size;
     delete root.dataset.mode; delete root.dataset.bg;
     if (cur.look === 'dark') root.dataset.mode = 'dark';
     else if (cur.look === 'tint' || cur.look === 'white') root.dataset.mode = 'light';
@@ -3322,7 +3339,7 @@ document.addEventListener('click', e => {
     try { localStorage.setItem('matchmaker.theme', JSON.stringify(cur)); } catch (e) {} draw();
   };
   $('#themebar').addEventListener('click', e => { const s = e.target.closest('[data-theme]'); if (s){ cur.theme = s.dataset.theme; apply(); } });
-  $('#themebar').addEventListener('change', e => { if (e.target.dataset.look !== undefined){ cur.look = e.target.value; apply(); } });
+  $('#themebar').addEventListener('change', e => { if (e.target.dataset.look !== undefined){ cur.look = e.target.value; apply(); } else if (e.target.dataset.size !== undefined){ cur.size = e.target.value; apply(); } });
   apply();
 }
 render();
