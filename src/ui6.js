@@ -132,3 +132,77 @@ document.addEventListener('click', e => {
   else if (a === 'ocuse'){ e.stopPropagation(); const O = ui.ocr; ocrLearn(O.orig, O.grid); ui.ocr = null; closeDialog(); O.done(O.grid); }
   else if (a === 'occancel'){ e.stopPropagation(); const O = ui.ocr; ui.ocr = null; closeDialog(); O.done(null); }
 }, true);
+
+/* =====================================================================
+   Import a whole folder of trial balances (button or drag a folder in)
+   ===================================================================== */
+const TB_EXT = /\.(xlsx|xlsm|xltx|xltm|csv|txt|tsv|pdf)$/i;
+function tbFlagsOf(sheets){
+  const flags = {};
+  for (const sh of sheets){
+    const r = sh.rows.findIndex(row => row.some(c => typeof c === 'string' && /hef rente|charge interest/i.test(c)));
+    if (r < 0) continue; const fr = sh.rows[r];
+    for (let h = 0; h < Math.min(8, sh.rows.length); h++){
+      const hr = sh.rows[h]; let ok = 0; const isNo = c => Number.isInteger(hr[c]) && hr[c] >= 1;
+      fr.forEach((v, c) => { if (typeof v === 'string' && /^(geen|rente)$/i.test(v.trim()) && isNo(c)) ok++; });
+      if (ok >= 3){ fr.forEach((v, c) => { if (typeof v === 'string' && /^(geen|rente)$/i.test(v.trim()) && isNo(c)) flags[String(hr[c])] = !/^geen$/i.test(v.trim()); }); break; }
+    }
+  }
+  return flags;
+}
+async function readTBFile(file){
+  const out = [];
+  if (/\.(xlsx|xlsm|xltx|xltm)$/i.test(file.name)){
+    const sheets = await readWorkbookSheets(await file.arrayBuffer()), flags = tbFlagsOf(sheets);
+    for (const sh of sheets){ const p = parseTBGrid(sh.rows); if (p.error || !p.hasHeader || p.lines.length < 2) continue; out.push({ file: file.webkitRelativePath || file.name, sheet: sh.name, p, flag: flags[sh.name] }); }
+  } else if (/\.pdf$/i.test(file.name)){
+    const p = parseTBGrid(await pdfToGrid(await file.arrayBuffer())); if (!p.error && p.hasHeader && p.lines.length >= 2) out.push({ file: file.webkitRelativePath || file.name, sheet: '', p });
+  } else {
+    const p = parseTBText(await file.text()); if (!p.error && p.hasHeader && p.lines.length >= 2) out.push({ file: file.webkitRelativePath || file.name, sheet: '', p });
+  }
+  return out;
+}
+async function importFolder(files){
+  const list = [...files].filter(f => TB_EXT.test(f.name) && !/^~\$/.test(f.name)).sort((a, b) => (a.webkitRelativePath || a.name).localeCompare(b.webkitRelativePath || b.name));
+  if (!list.length){ toast('No Excel, CSV, text or PDF files found in that folder.'); return; }
+  if (state.mode !== 'tb'){ state.mode = 'tb'; ui.tab = 'tb'; }
+  const d = openDialog(`<div class="db"><h3 style="margin-top:0">Reading ${list.length} file${list.length === 1 ? '' : 's'}…</h3><div class="small muted" id="fiMsg"></div></div>`);
+  const found = [], skipped = [];
+  for (let i = 0; i < list.length; i++){
+    const e = $('#fiMsg'); if (e) e.textContent = `${i + 1} of ${list.length}: ${list[i].name}`;
+    await new Promise(r => setTimeout(r, 0));
+    try { const r = await readTBFile(list[i]); if (r.length) found.push(...r); else skipped.push([list[i].webkitRelativePath || list[i].name, 'no trial balance found (needs Account / DR / CR columns)']); }
+    catch (err){ skipped.push([list[i].webkitRelativePath || list[i].name, err.message]); }
+  }
+  if (!found.length){ closeDialog(); render(); toast('No trial balances found in that folder.'); return; }
+  const seen = new Set();
+  const row = (f, n) => { const key = norm(f.p.name), dupInFolder = seen.has(key); seen.add(key); const ex = state.companies.some(c => norm(c.name) === key);
+    return `<tr><td><input type="checkbox" class="fick" data-n="${n}" ${dupInFolder ? '' : 'checked'}></td><td class="small">${esc(short(f.file, 46))}${f.sheet ? ' · ' + esc(f.sheet) : ''}</td><td>${esc(f.p.name)}</td><td class="num">${f.p.lines.length}</td><td>${ex ? '<span class="chip warn">replaces loaded</span>' : ''}${dupInFolder ? '<span class="chip bad">duplicate – unticked</span>' : ''}</td></tr>`; };
+  d.classList.add('wide');
+  d.innerHTML = `<div class="dh"><h3>Import folder</h3><button class="btn sm" data-act="closedlg">Cancel</button></div><div class="db">
+    <p class="small muted" style="margin-top:0">${found.length} trial balance${found.length === 1 ? '' : 's'} found in ${list.length} file${list.length === 1 ? '' : 's'}. Untick any you do not want.</p>
+    <div class="toolbar"><button class="btn sm" id="fiAll">Select all</button><button class="btn sm" id="fiNone">Select none</button></div>
+    <div class="scroll" style="max-height:48vh"><table class="t"><thead><tr><th></th><th>File</th><th>Company</th><th class="num">Accounts</th><th></th></tr></thead><tbody>${found.map(row).join('')}</tbody></table></div>
+    ${skipped.length ? `<details style="margin-top:10px"><summary class="small">${skipped.length} file${skipped.length === 1 ? '' : 's'} skipped</summary><ul class="small muted">${skipped.map(([n, why]) => `<li>${esc(n)} – ${esc(why)}</li>`).join('')}</ul></details>` : ''}
+    <div class="df"><button class="btn" data-act="closedlg">Cancel</button><button class="btn primary" id="fiGo">Import selected</button></div></div>`;
+  $('#fiAll', d).onclick = () => $$('.fick', d).forEach(c => c.checked = true);
+  $('#fiNone', d).onclick = () => $$('.fick', d).forEach(c => c.checked = false);
+  $('#fiGo', d).onclick = () => {
+    let n = 0;
+    $$('.fick', d).filter(c => c.checked).forEach(c => { const f = found[+c.dataset.n]; const r = upsertCompany(f.p); if (f.flag !== undefined) state.companies[r.idx].interest = f.flag; n++; });
+    memApplyTB(); audit(`Folder imported: ${n} trial balance${n === 1 ? '' : 's'}`); dirty(); closeDialog(); ui.tab = 'recon'; ui.sel = 0; render(); toast(`Imported ${n} trial balance${n === 1 ? '' : 's'} from the folder`);
+  };
+}
+/* dropping a folder onto the window */
+async function entryFiles(entry, acc){
+  if (entry.isFile){ await new Promise(r => entry.file(f => { try { Object.defineProperty(f, 'webkitRelativePath', { value: entry.fullPath.replace(/^\//, '') }); } catch (e) {} acc.push(f); r(); }, r)); }
+  else if (entry.isDirectory){ const rd = entry.createReader(); let batch; do { batch = await new Promise(r => rd.readEntries(r, () => r([]))); for (const e of batch) await entryFiles(e, acc); } while (batch.length); }
+}
+document.addEventListener('drop', async e => {
+  const items = [...(e.dataTransfer && e.dataTransfer.items || [])].map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+  if (!items.some(x => x.isDirectory)) return;
+  e.preventDefault(); e.stopPropagation(); document.body.classList.remove('dropping');
+  const acc = []; for (const it of items) await entryFiles(it, acc); importFolder(acc);
+}, true);
+document.addEventListener('click', e => { const t = e.target.closest('[data-act="importfolder"]'); if (t){ e.stopPropagation(); $('#fileFolder').click(); } }, true);
+document.addEventListener('change', e => { if (e.target.id === 'fileFolder'){ const f = [...e.target.files]; e.target.value = ''; importFolder(f); } }, true);

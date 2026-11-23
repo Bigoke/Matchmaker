@@ -134,7 +134,7 @@ function renderTabs(){
     return `<button class="${ui.tab === k ? 'on' : ''}" data-act="tab" data-tab="${k}">${t}${b}</button>`;
   }).join('') + exp;
   const acts = [ui.saveFail ? '<span class="chip bad" title="The browser could not store this project automatically">⚠ not auto-saved</span>' : '', `<input type="text" class="pname" placeholder="Project name" value="${esc(state.project.name)}" data-change="pname" title="Name this piece of work – it goes into saved files and reports">`];
-  if (state.mode === 'tb') acts.push('<button class="btn primary" data-act="paste">＋ Paste trial balance</button>', '<button class="btn" data-act="import">Import Excel…</button>');
+  if (state.mode === 'tb') acts.push('<button class="btn primary" data-act="paste">＋ Paste trial balance</button>', '<button class="btn" data-act="import">Import Excel…</button>', '<button class="btn" data-act="importfolder" title="Pick a folder of trial balances (Excel, CSV or PDF)">Import folder…</button>');
   acts.push(`<button class="btn" data-act="undo" title="Undo the last match / assignment (Ctrl+Z)" ${ui.undo.length ? '' : 'disabled'}>↶ Undo</button>`, '<button class="btn" data-act="savesession" title="Save everything loaded here to a project file">Save project</button>', '<button class="btn" data-act="loadsession">Open project</button>', '<button class="btn danger" data-act="reset">Reset</button>');
   $('#actions').innerHTML = acts.join('');
 }
@@ -152,7 +152,7 @@ function render(){
 function emptyState(){
   return `<div class="card empty"><h3>Start by adding your trial balances</h3>
   <p>Copy each company’s trial balance (Account, Description, DR, CR) from Excel or your accounting package and paste it here — or import your whole workbook at once.</p>
-  <div class="row" style="justify-content:center;margin-top:14px"><button class="btn primary" data-act="paste">Paste a trial balance</button><button class="btn" data-act="import">Import an Excel workbook…</button></div>
+  <div class="row" style="justify-content:center;margin-top:14px"><button class="btn primary" data-act="paste">Paste a trial balance</button><button class="btn" data-act="import">Import an Excel workbook…</button><button class="btn" data-act="importfolder">Import a whole folder…</button></div>
   <div class="steps"><div><b>1 · Paste</b>One trial balance per company. The company name is read from the heading line.</div>
   <div><b>2 · Reconcile</b>Loan accounts are matched to the other companies by name — even with spelling differences — and both sides are compared.</div>
   <div><b>3 · Interest</b>Choose a company, pick the loan accounts, set the rate, and download the journal CSV for import.</div></div>
@@ -173,7 +173,7 @@ function tbView(){
       ${c.interest ? '' : '<span class="tag">no interest</span>'}${tbIssueTag(c)}</li>`;
   }).join('');
   return `<div class="split"><aside class="card list"><div class="head"><h3>Companies</h3><span class="muted small">${cos.length} loaded</span></div>
-    <div class="btns"><button class="btn primary block" data-act="paste">＋ Paste trial balance</button><button class="btn block" data-act="import">Import Excel workbook…</button></div>
+    <div class="btns"><button class="btn primary block" data-act="paste">＋ Paste trial balance</button><button class="btn block" data-act="import">Import Excel workbook…</button><button class="btn block" data-act="importfolder">Import a whole folder…</button></div>
     ${cos.length > 8 ? `<div style="padding:0 14px 10px"><input type="text" id="colq" placeholder="Find a company…" value="${esc(ui.colq || '')}" data-change="colq"></div>` : ''}
     <ul>${list || '<li class="muted">No company matches.</li>'}</ul></aside><section>${tbDetail()}</section></div>`;
 }
