@@ -247,6 +247,8 @@ tr.cur td:not(:first-child){box-shadow:none}
 :root[data-bg="white"][data-mode="light"]{--bg:#ffffff;--soft:#f5f6f7;--line:#dfe3e6;--shadow:0 1px 2px rgba(20,30,40,.05)}
 @media (prefers-color-scheme:light){:root[data-bg="white"]:not([data-mode="dark"]){--bg:#ffffff;--soft:#f5f6f7;--line:#dfe3e6;--shadow:0 1px 2px rgba(20,30,40,.05)}}
 dialog.wide{max-width:min(1240px,97vw)}dialog .db select,dialog .db input[type=text],dialog .db input[type=number]{min-width:0}
+.ocrt td{padding:2px 3px}.ocin{width:100%;min-width:90px;padding:4px 6px;font:inherit;font-size:12.5px;border:1px solid var(--line);border-radius:4px;background:var(--card);color:var(--ink)}
+.ocin.lowc{background:var(--warn-bg);border-color:var(--warn)}
 
 </style>
 </head>
@@ -258,9 +260,9 @@ dialog.wide{max-width:min(1240px,97vw)}dialog .db select,dialog .db input[type=t
 <nav class="tabs" id="tabs"></nav>
 <main id="view"></main>
 <dialog id="dlg"></dialog>
-<input type="file" id="fileXlsx" accept=".xlsx,.xlsm,.csv,.txt,.tsv,.pdf" multiple hidden>
+<input type="file" id="fileXlsx" accept=".xlsx,.xlsm,.csv,.txt,.tsv,.pdf,.png,.jpg,.jpeg,.bmp,.webp" multiple hidden>
 <input type="file" id="fileSession" accept=".json" hidden>
-<input type="file" id="fileLedger" accept=".xlsx,.xlsm,.csv,.txt,.tsv,.pdf" hidden>
+<input type="file" id="fileLedger" accept=".xlsx,.xlsm,.csv,.txt,.tsv,.pdf,.png,.jpg,.jpeg,.bmp,.webp" hidden>
 <input type="file" id="fileBase" accept=".json" hidden>
 <input type="file" id="fileMap" accept=".json" hidden>
 <script>
@@ -1284,6 +1286,10 @@ async function pdfToGrid(buf){
     }
   }
   if (!items.length) throw new Error('no readable text found – this PDF may be a scanned image (needs OCR) or use an unsupported encoding');
+  return pdfLayout(items).grid;
+}
+/* Layout shared by PDF text and OCR words: items = {page,x,x2,y(up),text,fs,cf?} -> {grid, conf} */
+function pdfLayout(items){
   // ---- layout: lines -> cells -> columns
   const rowsOut = [], cells = [];
   const byPage = {}; items.forEach(it => (byPage[it.page] = byPage[it.page] || []).push(it));
@@ -1292,8 +1298,8 @@ async function pdfToGrid(buf){
     const flush = () => {
       if (!line.length) return; line.sort((a, b) => a.x - b.x); const cs = [];
       for (const it of line){ const last = cs[cs.length - 1];
-        if (last && it.x - last.x2 < Math.max(it.fs, last.fs) * 0.6){ const gap = it.x - last.x2; last.text += (gap > Math.max(it.fs, 1) * 0.12 && !/\s$/.test(last.text) ? ' ' : '') + it.text; last.x2 = Math.max(last.x2, it.x2); }
-        else cs.push({ x: it.x, x2: it.x2, text: it.text, fs: it.fs }); }
+        if (last && it.x - last.x2 < Math.max(it.fs, last.fs) * 0.6){ const gap = it.x - last.x2; last.text += (gap > Math.max(it.fs, 1) * 0.12 && !/\s$/.test(last.text) ? ' ' : '') + it.text; last.x2 = Math.max(last.x2, it.x2); last.cf = Math.min(last.cf == null ? 100 : last.cf, it.cf == null ? 100 : it.cf); }
+        else cs.push({ x: it.x, x2: it.x2, text: it.text, fs: it.fs, cf: it.cf == null ? 100 : it.cf }); }
       cs.forEach(c => { c.text = c.text.replace(/\s+/g, ' ').trim(); c.num = /^[-(+]?\s?\d[\d ,]*[.,]\d{2}\)?\s?(CR|DR|Cr|Dr|cr|dr)?\s?-?$/.test(c.text) || /^[-(]?\d{1,3}(,\d{3})+\)?$/.test(c.text); });
       rowsOut.push(cs.filter(c => c.text)); line = []; ly = null;
     };
@@ -1310,7 +1316,9 @@ async function pdfToGrid(buf){
   const colsT = cluster(cells.filter(c => !c.num && c.forceN === undefined).map(c => c.x), 9);
   const cols = [...colsT.map(x => ({ k: 't', x })), ...nspans.map(sp => ({ k: 'n', x: sp.x }))].sort((a, b) => a.x - b.x);
   const nearest = (c) => { if (c.forceN !== undefined) return cols.findIndex(col => col.k === 'n' && col.x === nspans[c.forceN].x); let best = -1, bd = 1e9; cols.forEach((col, n) => { if (col.k !== (c.num ? 'n' : 't')) return; const d = Math.abs(col.x - (c.num ? c.x2 : c.x)); if (d < bd){ bd = d; best = n; } }); return best; };
-  return rowsOut.map(r => { const out = new Array(cols.length).fill(''); r.forEach(c => { const n = nearest(c); if (n < 0) return; out[n] = out[n] ? out[n] + ' ' + c.text : c.text; }); return out; }).filter(r => r.some(x => x));
+  const out = [], conf = [];
+  rowsOut.forEach(r => { const o = new Array(cols.length).fill(''), q = new Array(cols.length).fill(100); r.forEach(c => { const n = nearest(c); if (n < 0) return; o[n] = o[n] ? o[n] + ' ' + c.text : c.text; q[n] = Math.min(q[n], c.cf == null ? 100 : c.cf); }); if (o.some(x => x)){ out.push(o); conf.push(q); } });
+  return { grid: out, conf };
 }
 
 /* ============ export mapper ============ */
@@ -1396,7 +1404,7 @@ const MAP_PRESETS = {
 };
 function mapDefaults(){ return { id: '', name: '', kind: 'csv', delimiter: 'comma', quoting: 'auto', bom: true, eol: 'crlf', header: true, dateFmt: 'dd/mm/yyyy', decimals: 2, decSep: '.', thousand: '', neg: 'minus', only: 'all', skipZero: true, summarise: false, fileName: '{company} journal', pre: '', post: '', cols: [] }; }
 
-if (typeof module !== 'undefined') module.exports = { norm, tokens, cleanName, buildMatcher, buildModel, parseTBGrid, parseTBText, splitDelimited, parseNum, readZip, readWorkbookSheets, makeZip, roundInterest, buildJournalCSV, lineKey, groupOf, round2, aliasTexts, isHeaderLine, defaultAccounts, fmtDate, parseDate, guessLedgerMap, buildLedger, matchLedgers, makeXlsx, calcInterest, mapJournal, mapFileName, mapDefaults, MAP_PRESETS, MAP_SOURCES, MAP_DATES, mapDate, mapNum, ageDays, ageBucket, AGE_BUCKETS, tbChecks, pdfToGrid };
+if (typeof module !== 'undefined') module.exports = { norm, tokens, cleanName, buildMatcher, buildModel, parseTBGrid, parseTBText, splitDelimited, parseNum, readZip, readWorkbookSheets, makeZip, roundInterest, buildJournalCSV, lineKey, groupOf, round2, aliasTexts, isHeaderLine, defaultAccounts, fmtDate, parseDate, guessLedgerMap, buildLedger, matchLedgers, makeXlsx, calcInterest, mapJournal, mapFileName, mapDefaults, MAP_PRESETS, MAP_SOURCES, MAP_DATES, mapDate, mapNum, ageDays, ageBucket, AGE_BUCKETS, tbChecks, pdfToGrid, pdfLayout };
 // </ENGINE>
 
 // <UI>
@@ -2004,7 +2012,10 @@ async function handleFiles(files){
   if (state.mode !== 'tb'){ state.mode = 'tb'; ui.tab = 'tb'; render(); }
   for (const file of f){
     if (/\.(xlsx|xlsm|xltx|xltm)$/i.test(file.name)) await openImportFile(file);
-    else if (/\.pdf$/i.test(file.name)){ try { const g = await pdfToGrid(await file.arrayBuffer()); openPaste(g.map(r => r.join('\t')).join('\n')); } catch (e){ toast('Could not read that PDF: ' + e.message); } }
+    else if (/\.pdf$/i.test(file.name) || IMG_RE.test(file.name)){ try {
+      let g; if (IMG_RE.test(file.name)) g = await readScanned(file);
+      else { try { g = await pdfToGrid(await file.arrayBuffer()); } catch (e){ if (!/scanned|no readable text/i.test(e.message)) throw e; g = await readScanned(file); } }
+      if (g) openPaste(g.map(r => r.join('\t')).join('\n')); } catch (e){ toast('Could not read that file: ' + e.message); } }
     else { const t = await file.text(); openPaste(t); }
   }
 }
@@ -2177,6 +2188,7 @@ function homeView(){
 function ledgerFromGrid(side, grid, extra){
   const gm = guessLedgerMap(grid);
   ui.lraw[side] = Object.assign({ grid, hdr: gm.hdr, map: gm.map, open: true, source: 'Pasted', sheets: null, sheet: 0 }, extra || {});
+  layApply(ui.lraw[side]);
   rebuildLedger(side);
 }
 function rebuildLedger(side){
@@ -2193,7 +2205,13 @@ async function ledgerFile(file, side){
       const sheets = (await readWorkbookSheets(await file.arrayBuffer())).filter(s => s.rows.some(r => r.some(c => c !== '' && c != null)));
       if (!sheets.length){ toast('That workbook has no data.'); return; }
       ledgerFromGrid(side, sheets[0].rows, { sheets, sheet: 0, source: file.name + ' – ' + sheets[0].name });
-    } else if (/\.pdf$/i.test(file.name)) ledgerFromGrid(side, await pdfToGrid(await file.arrayBuffer()), { source: file.name + ' (PDF)' });
+    } else if (/\.pdf$/i.test(file.name)){
+      let g = null, src = ' (PDF)';
+      try { g = await pdfToGrid(await file.arrayBuffer()); } catch (e){ if (!/scanned|no readable text/i.test(e.message)) throw e; g = await readScanned(file); src = ' (scanned, OCR)'; if (!g){ return; } }
+      ledgerFromGrid(side, g, { source: file.name + src });
+    } else if (IMG_RE.test(file.name)){
+      const g = await readScanned(file); if (!g) return; ledgerFromGrid(side, g, { source: file.name + ' (scanned, OCR)' });
+    }
     else ledgerFromGrid(side, splitDelimited(await file.text()), { source: file.name });
     render(); toast(`Loaded ${state.ledger[side].items.length} transactions into ${state.ledger[side].label || side}`);
   } catch (e){ console.error(e); toast('Could not read that file: ' + e.message); }
@@ -2474,7 +2492,7 @@ document.addEventListener('click', e => {
   else if (a === 'pack') exportPack();
   else if (a === 'lclear'){ delete ui.lraw[d.side]; L[d.side].items = []; L[d.side].skipped = 0; L.manual = []; L.rejected = []; dirty(); render(); }
   else if (a === 'lfile'){ ui.lfileSide = d.side; $('#fileLedger').click(); }
-  else if (a === 'lgo'){ ui.tab = 'lres'; ui.lsub = 'sum'; render(); window.scrollTo(0, 0); }
+  else if (a === 'lgo'){ ['A', 'B'].forEach(k => { const r = ui.lraw[k]; if (r && !r.learned) layLearn(r); }); ui.tab = 'lres'; ui.lsub = 'sum'; render(); window.scrollTo(0, 0); }
   else if (a === 'lsub'){ ui.lsub = d.v; render(); }
   else if (a === 'lmore'){ e.preventDefault(); ui.lall = true; render(); }
   else if (a === 'lunmatch'){
@@ -2506,7 +2524,7 @@ document.addEventListener('change', e => {
     const raw = ui.lraw[side], col = +t.dataset.col, role = t.value;
     for (const k in raw.map) if (raw.map[k] === col) raw.map[k] = -1;
     if (role){ raw.map[role] = col; if (role === 'debit' || role === 'credit') raw.map.amount = -1; if (role === 'amount'){ raw.map.debit = -1; raw.map.credit = -1; } }
-    rebuildLedger(side); render();
+    layLearn(raw); rebuildLedger(side); render();
   }
   else if (a === 'lhdr'){ const raw = ui.lraw[side]; raw.hdr = Math.max(0, parseInt(t.value) || 0) - 1; rebuildLedger(side); render(); }
   else if (a === 'lsheet'){ const raw = ui.lraw[side]; raw.sheet = +t.value; const sh = raw.sheets[raw.sheet]; const gm = guessLedgerMap(sh.rows); raw.grid = sh.rows; raw.hdr = gm.hdr; raw.map = gm.map; raw.source = raw.source.split(' – ')[0] + ' – ' + sh.name; rebuildLedger(side); render(); }
@@ -2598,9 +2616,9 @@ function memLedgerManual(A, B, manual, rejected){
   return out;
 }
 function memCardHTML(){
-  const n1 = Object.keys(MEM.tb).length, n2 = MEM.ledger.length;
-  return `<div class="card pad" style="margin-top:22px"><div class="row"><div class="grow" style="flex:1"><b>Matchmaker remembers your decisions</b><div class="small muted">${n1} company assignment${n1 === 1 ? '' : 's'} and ${n2} ledger match${n2 === 1 ? '' : 'es'} are applied automatically the next time you load similar data (kept only in this browser).</div></div>
-    <button class="btn sm" data-act="memforget" ${n1 + n2 ? '' : 'disabled'}>Forget all</button></div></div>`;
+  const n1 = Object.keys(MEM.tb).length, n2 = MEM.ledger.length, n3 = Object.keys((MEM.ocr || {}).cell || {}).length, n4 = Object.keys(MEM.lay || {}).length;
+  return `<div class="card pad" style="margin-top:22px"><div class="row"><div class="grow" style="flex:1"><b>Matchmaker remembers your decisions</b><div class="small muted">${n1} company assignment${n1 === 1 ? '' : 's'} and ${n2} ledger match${n2 === 1 ? '' : 'es'} are applied automatically the next time you load similar data${n3 || n4 ? `, plus ${n3} scan correction${n3 === 1 ? '' : 's'} and ${n4} statement layout${n4 === 1 ? '' : 's'}` : ''} (kept only in this browser).</div></div>
+    <button class="btn sm" data-act="memforget" ${n1 + n2 + n3 + n4 ? '' : 'disabled'}>Forget all</button></div></div>`;
 }
 
 /* ---------- comparison with a previous period ---------- */
@@ -3073,7 +3091,7 @@ document.addEventListener('change', e => {
 });
 
 /* ---------- sample data + about ---------- */
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 const SAMPLE_TB = [
 `Alpha Trading (Pty) Ltd
 Trial Balance : 01/03/2024 to 28/02/2025
@@ -3150,6 +3168,141 @@ document.addEventListener('click', e => {
   else if (t.dataset.act === 'about'){ e.stopPropagation(); openDialog(aboutHTML()); }
 });
 window.addEventListener('beforeunload', e => { if (ui.saveFail){ e.preventDefault(); e.returnValue = ''; } });
+
+/* =====================================================================
+   Offline OCR (scanned PDFs and photos) + learning from corrections
+   OCR files are served by the Windows app from /ocr/ – nothing leaves the PC.
+   ===================================================================== */
+const OCR_OK = () => location.protocol === 'http:' && location.hostname === '127.0.0.1';
+const IMG_RE = /\.(png|jpe?g|bmp|webp|tiff?)$/i;
+const loadScript = src => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('Could not load ' + src)); document.head.appendChild(s); });
+let ocrWorker = null, ocrProg = null;
+
+/* ---------- learning store (inside MEM, so it is saved, undone and exported with the rest) ---------- */
+function ocrMem(){ MEM.ocr = MEM.ocr || { cell: {}, chr: {} }; MEM.ocr.cell = MEM.ocr.cell || {}; MEM.ocr.chr = MEM.ocr.chr || {}; return MEM.ocr; }
+function layMem(){ MEM.lay = MEM.lay || {}; return MEM.lay; }
+const laySig = (grid, hdr) => hdr >= 0 && grid[hdr] ? norm(grid[hdr].join('|')) : '';
+function layApply(raw){
+  const sig = laySig(raw.grid, raw.hdr), m = sig && layMem()[sig];
+  if (!m) return false;
+  const width = Math.max(...raw.grid.slice(0, 20).map(r => r.length));
+  if (Object.values(m).some(c => c >= width)) return false;
+  raw.map = Object.assign({}, m); raw.learned = true; return true;
+}
+function layLearn(raw){
+  const sig = laySig(raw.grid, raw.hdr); if (!sig) return;
+  layMem()[sig] = Object.assign({}, raw.map); memSave();
+}
+
+/* ---------- cleaning OCR text, using the built-in rules and what has been learned ---------- */
+const NUMISH = /^[-(+]?[\dOolIiSsBbZz|., ]*\d[\dOolIiSsBbZz|., ]*[.,][\dOolIiSsBbZz|]{2}\)?(\s?(CR|DR|Cr|Dr))?$/;
+function ocrClean(text){
+  const M = ocrMem(); let t = text.trim();
+  if (M.cell[t] != null) return M.cell[t];
+  if (NUMISH.test(t)){
+    const fix = { O: '0', o: '0', l: '1', I: '1', i: '1', '|': '1', S: '5', s: '5', B: '8', b: '6', Z: '2', z: '2' };
+    let out = '';
+    for (const ch of t){
+      let c = fix[ch] || ch;
+      for (const k in M.chr){ const [f, to] = k.split('>'); if (f === ch && M.chr[k] >= 2) c = to; }
+      out += c;
+    }
+    t = out;
+  }
+  return t;
+}
+/* learn from what the user changed on the review screen */
+function ocrLearn(orig, edited){
+  const M = ocrMem(); let n = 0;
+  edited.forEach((row, r) => row.forEach((v, c) => {
+    const o = orig[r] && orig[r][c]; if (o == null || o === v || !o.trim()) return;
+    M.cell[o.trim()] = v; n++;
+    if (o.length === v.length){ const d = []; for (let i = 0; i < o.length; i++) if (o[i] !== v[i]) d.push([o[i], v[i]]); if (d.length && d.length <= 2) d.forEach(([f, t]) => { if (/\d/.test(t) || /\d/.test(f)){ const k = f + '>' + t; M.chr[k] = (M.chr[k] || 0) + 1; } }); }
+  }));
+  const ks = Object.keys(M.cell); if (ks.length > 4000) ks.slice(0, ks.length - 4000).forEach(k => delete M.cell[k]);
+  if (n){ memSave(); audit(`OCR: learned ${n} correction${n === 1 ? '' : 's'}`); }
+  return n;
+}
+
+/* ---------- running the OCR ---------- */
+async function ocrGetWorker(){
+  if (!window.Tesseract) await loadScript('/ocr/tesseract.min.js');
+  if (!ocrWorker){
+    ocrWorker = await Tesseract.createWorker('eng', 1, { workerPath: '/ocr/worker.min.js', corePath: '/ocr/', langPath: '/ocr/lang', workerBlobURL: false, logger: m => { if (ocrProg) ocrProg(m); } });
+    await ocrWorker.setParameters({ preserve_interword_spaces: '1', tessedit_pageseg_mode: '6' });
+  }
+  return ocrWorker;
+}
+async function ocrCanvases(file, each){
+  if (/\.pdf$/i.test(file.name)){
+    if (!window.pdfjsLib){ await loadScript('/ocr/pdf.min.js'); pdfjsLib.GlobalWorkerOptions.workerSrc = '/ocr/pdf.worker.min.js'; }
+    const doc = await pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise, n = Math.min(doc.numPages, 80);
+    for (let p = 1; p <= n; p++){
+      const page = await doc.getPage(p), vp = page.getViewport({ scale: 2.5 }), cv = document.createElement('canvas');
+      cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+      await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+      await each(cv, p, n);
+    }
+  } else {
+    const bmp = await createImageBitmap(file), k = bmp.width < 1800 ? 1800 / bmp.width : 1, cv = document.createElement('canvas');
+    cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k);
+    const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(bmp, 0, 0, cv.width, cv.height);
+    await each(cv, 1, 1);
+  }
+}
+async function ocrToGrid(file){
+  if (!OCR_OK()) throw new Error('Reading scanned documents works in the Matchmaker Windows app (Matchmaker.exe).');
+  const d = openDialog(`<div class="db" style="min-width:320px"><h3 style="margin-top:0">Reading the scan…</h3><div class="small muted" id="ocrMsg">Starting the text reader</div><div style="height:8px;border-radius:4px;background:var(--line);margin-top:12px;overflow:hidden"><div id="ocrBar" style="height:100%;width:2%;background:var(--accent);transition:width .2s"></div></div></div>`);
+  const msg = t => { const e = $('#ocrMsg'); if (e) e.textContent = t; }, bar = f => { const e = $('#ocrBar'); if (e) e.style.width = Math.max(2, Math.min(100, f * 100)) + '%'; };
+  const items = []; let pageOf = 0, total = 1;
+  try {
+    const w = await ocrGetWorker();
+    await ocrCanvases(file, async (cv, p, n) => {
+      pageOf = p; total = n; msg(`Page ${p} of ${n}`); bar((p - 1) / n);
+      ocrProg = m => { if (m.status === 'recognizing text') bar((p - 1 + m.progress) / n); };
+      const { data } = await w.recognize(cv), k = 595 / cv.width;
+      (data.words || []).forEach(wd => { const b = wd.bbox; if (!wd.text || !wd.text.trim()) return; items.push({ page: p, x: b.x0 * k, x2: b.x1 * k, y: -((b.y0 + b.y1) / 2) * k, text: wd.text, fs: Math.max(4, (b.y1 - b.y0) * k), cf: wd.confidence }); });
+    });
+  } finally { ocrProg = null; closeDialog(); }
+  if (!items.length) throw new Error('no text could be read from that scan');
+  const L = pdfLayout(items);
+  L.grid = L.grid.map(r => r.map(ocrClean));
+  return { grid: L.grid, conf: L.conf, pages: total };
+}
+
+/* ---------- review screen: check / fix the text before it is used ---------- */
+function ocrReview(file, res, done){
+  ui.ocr = { grid: res.grid.map(r => r.slice()), orig: res.grid.map(r => r.slice()), conf: res.conf, file: file.name, done };
+  const d = openDialog(ocrReviewHTML()); d.classList.add('wide');
+}
+function ocrReviewHTML(){
+  const O = ui.ocr, w = Math.max(...O.grid.map(r => r.length));
+  const rows = O.grid.map((r, i) => `<tr data-r="${i}"><td class="muted small">${i + 1}</td>${Array.from({ length: w }, (_, c) => { const cf = O.conf[i][c], bad = cf < 80 && (r[c] || '') !== ''; return `<td><input class="ocin ${bad ? 'lowc' : ''}" data-oc="${i},${c}" value="${esc(r[c] || '')}" title="${bad ? 'Low confidence: ' + Math.round(cf) + '%' : ''}"></td>`; }).join('')}<td><button class="btn sm" data-act="ocdel" data-r="${i}" title="Remove this row">✕</button></td></tr>`).join('');
+  return `<div class="dh"><h3>Check the scanned text</h3><button class="btn sm" data-act="occancel">Cancel</button></div><div class="db">
+    <p class="small" style="margin-top:0">Matchmaker read <b>${O.grid.length}</b> rows from <b>${esc(O.file)}</b>. Cells shaded <span class="chip warn">amber</span> were hard to read – please check them against the original, especially amounts. Anything you correct is <b>learned</b> and fixed automatically next time.</p>
+    <div class="scroll" style="max-height:52vh"><table class="t ocrt"><tbody>${rows}</tbody></table></div>
+    <div class="row" style="margin-top:12px"><button class="btn primary" data-act="ocuse">Use this text</button><span class="small muted">${ui.ocr.conf.flat().filter(c => c < 80).length} cells to check</span></div></div>`;
+}
+
+/* ---------- entry points used by the file loaders ---------- */
+async function readScanned(file){
+  if (!OCR_OK()){ toast('Scanned documents can be read in the Matchmaker Windows app (Matchmaker.exe).'); return null; }
+  const res = await ocrToGrid(file);
+  return new Promise(resolve => ocrReview(file, res, g => resolve(g)));
+}
+
+document.addEventListener('DOMContentLoaded', () => { const d = $('#dlg'); if (d) d.addEventListener('close', () => { if (ui.ocr && !d.open){ const O = ui.ocr; ui.ocr = null; O.done(null); } }); });
+document.addEventListener('input', e => {
+  const t = e.target; if (!t.dataset || !t.dataset.oc || !ui.ocr) return;
+  const [r, c] = t.dataset.oc.split(',').map(Number); ui.ocr.grid[r][c] = t.value; t.classList.remove('lowc');
+});
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-act]'); if (!t || !ui.ocr) return;
+  const a = t.dataset.act;
+  if (a === 'ocdel'){ e.stopPropagation(); const r = +t.dataset.r; ui.ocr.grid.splice(r, 1); ui.ocr.orig.splice(r, 1); ui.ocr.conf.splice(r, 1); const d = $('#dlg'); d.innerHTML = ocrReviewHTML(); }
+  else if (a === 'ocuse'){ e.stopPropagation(); const O = ui.ocr; ocrLearn(O.orig, O.grid); ui.ocr = null; closeDialog(); O.done(O.grid); }
+  else if (a === 'occancel'){ e.stopPropagation(); const O = ui.ocr; ui.ocr = null; closeDialog(); O.done(null); }
+}, true);
 
 { const bl = document.getElementById('brandlogo'); if (bl) bl.innerHTML = LOGO; }
 {

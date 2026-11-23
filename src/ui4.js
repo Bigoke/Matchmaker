@@ -73,9 +73,9 @@ function memLedgerManual(A, B, manual, rejected){
   return out;
 }
 function memCardHTML(){
-  const n1 = Object.keys(MEM.tb).length, n2 = MEM.ledger.length;
-  return `<div class="card pad" style="margin-top:22px"><div class="row"><div class="grow" style="flex:1"><b>Matchmaker remembers your decisions</b><div class="small muted">${n1} company assignment${n1 === 1 ? '' : 's'} and ${n2} ledger match${n2 === 1 ? '' : 'es'} are applied automatically the next time you load similar data (kept only in this browser).</div></div>
-    <button class="btn sm" data-act="memforget" ${n1 + n2 ? '' : 'disabled'}>Forget all</button></div></div>`;
+  const n1 = Object.keys(MEM.tb).length, n2 = MEM.ledger.length, n3 = Object.keys((MEM.ocr || {}).cell || {}).length, n4 = Object.keys(MEM.lay || {}).length;
+  return `<div class="card pad" style="margin-top:22px"><div class="row"><div class="grow" style="flex:1"><b>Matchmaker remembers your decisions</b><div class="small muted">${n1} company assignment${n1 === 1 ? '' : 's'} and ${n2} ledger match${n2 === 1 ? '' : 'es'} are applied automatically the next time you load similar data${n3 || n4 ? `, plus ${n3} scan correction${n3 === 1 ? '' : 's'} and ${n4} statement layout${n4 === 1 ? '' : 's'}` : ''} (kept only in this browser).</div></div>
+    <button class="btn sm" data-act="memforget" ${n1 + n2 + n3 + n4 ? '' : 'disabled'}>Forget all</button></div></div>`;
 }
 
 /* ---------- comparison with a previous period ---------- */

@@ -43,6 +43,7 @@ function homeView(){
 function ledgerFromGrid(side, grid, extra){
   const gm = guessLedgerMap(grid);
   ui.lraw[side] = Object.assign({ grid, hdr: gm.hdr, map: gm.map, open: true, source: 'Pasted', sheets: null, sheet: 0 }, extra || {});
+  layApply(ui.lraw[side]);
   rebuildLedger(side);
 }
 function rebuildLedger(side){
@@ -59,7 +60,13 @@ async function ledgerFile(file, side){
       const sheets = (await readWorkbookSheets(await file.arrayBuffer())).filter(s => s.rows.some(r => r.some(c => c !== '' && c != null)));
       if (!sheets.length){ toast('That workbook has no data.'); return; }
       ledgerFromGrid(side, sheets[0].rows, { sheets, sheet: 0, source: file.name + ' – ' + sheets[0].name });
-    } else if (/\.pdf$/i.test(file.name)) ledgerFromGrid(side, await pdfToGrid(await file.arrayBuffer()), { source: file.name + ' (PDF)' });
+    } else if (/\.pdf$/i.test(file.name)){
+      let g = null, src = ' (PDF)';
+      try { g = await pdfToGrid(await file.arrayBuffer()); } catch (e){ if (!/scanned|no readable text/i.test(e.message)) throw e; g = await readScanned(file); src = ' (scanned, OCR)'; if (!g){ return; } }
+      ledgerFromGrid(side, g, { source: file.name + src });
+    } else if (IMG_RE.test(file.name)){
+      const g = await readScanned(file); if (!g) return; ledgerFromGrid(side, g, { source: file.name + ' (scanned, OCR)' });
+    }
     else ledgerFromGrid(side, splitDelimited(await file.text()), { source: file.name });
     render(); toast(`Loaded ${state.ledger[side].items.length} transactions into ${state.ledger[side].label || side}`);
   } catch (e){ console.error(e); toast('Could not read that file: ' + e.message); }
@@ -340,7 +347,7 @@ document.addEventListener('click', e => {
   else if (a === 'pack') exportPack();
   else if (a === 'lclear'){ delete ui.lraw[d.side]; L[d.side].items = []; L[d.side].skipped = 0; L.manual = []; L.rejected = []; dirty(); render(); }
   else if (a === 'lfile'){ ui.lfileSide = d.side; $('#fileLedger').click(); }
-  else if (a === 'lgo'){ ui.tab = 'lres'; ui.lsub = 'sum'; render(); window.scrollTo(0, 0); }
+  else if (a === 'lgo'){ ['A', 'B'].forEach(k => { const r = ui.lraw[k]; if (r && !r.learned) layLearn(r); }); ui.tab = 'lres'; ui.lsub = 'sum'; render(); window.scrollTo(0, 0); }
   else if (a === 'lsub'){ ui.lsub = d.v; render(); }
   else if (a === 'lmore'){ e.preventDefault(); ui.lall = true; render(); }
   else if (a === 'lunmatch'){
@@ -372,7 +379,7 @@ document.addEventListener('change', e => {
     const raw = ui.lraw[side], col = +t.dataset.col, role = t.value;
     for (const k in raw.map) if (raw.map[k] === col) raw.map[k] = -1;
     if (role){ raw.map[role] = col; if (role === 'debit' || role === 'credit') raw.map.amount = -1; if (role === 'amount'){ raw.map.debit = -1; raw.map.credit = -1; } }
-    rebuildLedger(side); render();
+    layLearn(raw); rebuildLedger(side); render();
   }
   else if (a === 'lhdr'){ const raw = ui.lraw[side]; raw.hdr = Math.max(0, parseInt(t.value) || 0) - 1; rebuildLedger(side); render(); }
   else if (a === 'lsheet'){ const raw = ui.lraw[side]; raw.sheet = +t.value; const sh = raw.sheets[raw.sheet]; const gm = guessLedgerMap(sh.rows); raw.grid = sh.rows; raw.hdr = gm.hdr; raw.map = gm.map; raw.source = raw.source.split(' – ')[0] + ' – ' + sh.name; rebuildLedger(side); render(); }

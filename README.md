@@ -14,4 +14,4 @@ cd launcher && GOOS=windows GOARCH=amd64 go build -ldflags "-s -w -H=windowsgui"
 A GitHub Action (`.github/workflows/build.yml`) rebuilds both on every push.
 
 ## Test
-`node tests/audit1.js` (engine) and `node tests/audit2.js` (browser, needs Playwright).
+`node tests/audit1.js` (engine) and `node tests/audit2.js` (browser, needs Playwright). OCR tests (`tests/ocr_learn.js`) need the launcher running; scanned documents are read only in the Windows app.

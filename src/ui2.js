@@ -96,7 +96,10 @@ async function handleFiles(files){
   if (state.mode !== 'tb'){ state.mode = 'tb'; ui.tab = 'tb'; render(); }
   for (const file of f){
     if (/\.(xlsx|xlsm|xltx|xltm)$/i.test(file.name)) await openImportFile(file);
-    else if (/\.pdf$/i.test(file.name)){ try { const g = await pdfToGrid(await file.arrayBuffer()); openPaste(g.map(r => r.join('\t')).join('\n')); } catch (e){ toast('Could not read that PDF: ' + e.message); } }
+    else if (/\.pdf$/i.test(file.name) || IMG_RE.test(file.name)){ try {
+      let g; if (IMG_RE.test(file.name)) g = await readScanned(file);
+      else { try { g = await pdfToGrid(await file.arrayBuffer()); } catch (e){ if (!/scanned|no readable text/i.test(e.message)) throw e; g = await readScanned(file); } }
+      if (g) openPaste(g.map(r => r.join('\t')).join('\n')); } catch (e){ toast('Could not read that file: ' + e.message); } }
     else { const t = await file.text(); openPaste(t); }
   }
 }

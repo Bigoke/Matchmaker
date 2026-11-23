@@ -1018,6 +1018,10 @@ async function pdfToGrid(buf){
     }
   }
   if (!items.length) throw new Error('no readable text found – this PDF may be a scanned image (needs OCR) or use an unsupported encoding');
+  return pdfLayout(items).grid;
+}
+/* Layout shared by PDF text and OCR words: items = {page,x,x2,y(up),text,fs,cf?} -> {grid, conf} */
+function pdfLayout(items){
   // ---- layout: lines -> cells -> columns
   const rowsOut = [], cells = [];
   const byPage = {}; items.forEach(it => (byPage[it.page] = byPage[it.page] || []).push(it));
@@ -1026,8 +1030,8 @@ async function pdfToGrid(buf){
     const flush = () => {
       if (!line.length) return; line.sort((a, b) => a.x - b.x); const cs = [];
       for (const it of line){ const last = cs[cs.length - 1];
-        if (last && it.x - last.x2 < Math.max(it.fs, last.fs) * 0.6){ const gap = it.x - last.x2; last.text += (gap > Math.max(it.fs, 1) * 0.12 && !/\s$/.test(last.text) ? ' ' : '') + it.text; last.x2 = Math.max(last.x2, it.x2); }
-        else cs.push({ x: it.x, x2: it.x2, text: it.text, fs: it.fs }); }
+        if (last && it.x - last.x2 < Math.max(it.fs, last.fs) * 0.6){ const gap = it.x - last.x2; last.text += (gap > Math.max(it.fs, 1) * 0.12 && !/\s$/.test(last.text) ? ' ' : '') + it.text; last.x2 = Math.max(last.x2, it.x2); last.cf = Math.min(last.cf == null ? 100 : last.cf, it.cf == null ? 100 : it.cf); }
+        else cs.push({ x: it.x, x2: it.x2, text: it.text, fs: it.fs, cf: it.cf == null ? 100 : it.cf }); }
       cs.forEach(c => { c.text = c.text.replace(/\s+/g, ' ').trim(); c.num = /^[-(+]?\s?\d[\d ,]*[.,]\d{2}\)?\s?(CR|DR|Cr|Dr|cr|dr)?\s?-?$/.test(c.text) || /^[-(]?\d{1,3}(,\d{3})+\)?$/.test(c.text); });
       rowsOut.push(cs.filter(c => c.text)); line = []; ly = null;
     };
@@ -1044,7 +1048,9 @@ async function pdfToGrid(buf){
   const colsT = cluster(cells.filter(c => !c.num && c.forceN === undefined).map(c => c.x), 9);
   const cols = [...colsT.map(x => ({ k: 't', x })), ...nspans.map(sp => ({ k: 'n', x: sp.x }))].sort((a, b) => a.x - b.x);
   const nearest = (c) => { if (c.forceN !== undefined) return cols.findIndex(col => col.k === 'n' && col.x === nspans[c.forceN].x); let best = -1, bd = 1e9; cols.forEach((col, n) => { if (col.k !== (c.num ? 'n' : 't')) return; const d = Math.abs(col.x - (c.num ? c.x2 : c.x)); if (d < bd){ bd = d; best = n; } }); return best; };
-  return rowsOut.map(r => { const out = new Array(cols.length).fill(''); r.forEach(c => { const n = nearest(c); if (n < 0) return; out[n] = out[n] ? out[n] + ' ' + c.text : c.text; }); return out; }).filter(r => r.some(x => x));
+  const out = [], conf = [];
+  rowsOut.forEach(r => { const o = new Array(cols.length).fill(''), q = new Array(cols.length).fill(100); r.forEach(c => { const n = nearest(c); if (n < 0) return; o[n] = o[n] ? o[n] + ' ' + c.text : c.text; q[n] = Math.min(q[n], c.cf == null ? 100 : c.cf); }); if (o.some(x => x)){ out.push(o); conf.push(q); } });
+  return { grid: out, conf };
 }
 
 /* ============ export mapper ============ */
@@ -1130,5 +1136,5 @@ const MAP_PRESETS = {
 };
 function mapDefaults(){ return { id: '', name: '', kind: 'csv', delimiter: 'comma', quoting: 'auto', bom: true, eol: 'crlf', header: true, dateFmt: 'dd/mm/yyyy', decimals: 2, decSep: '.', thousand: '', neg: 'minus', only: 'all', skipZero: true, summarise: false, fileName: '{company} journal', pre: '', post: '', cols: [] }; }
 
-if (typeof module !== 'undefined') module.exports = { norm, tokens, cleanName, buildMatcher, buildModel, parseTBGrid, parseTBText, splitDelimited, parseNum, readZip, readWorkbookSheets, makeZip, roundInterest, buildJournalCSV, lineKey, groupOf, round2, aliasTexts, isHeaderLine, defaultAccounts, fmtDate, parseDate, guessLedgerMap, buildLedger, matchLedgers, makeXlsx, calcInterest, mapJournal, mapFileName, mapDefaults, MAP_PRESETS, MAP_SOURCES, MAP_DATES, mapDate, mapNum, ageDays, ageBucket, AGE_BUCKETS, tbChecks, pdfToGrid };
+if (typeof module !== 'undefined') module.exports = { norm, tokens, cleanName, buildMatcher, buildModel, parseTBGrid, parseTBText, splitDelimited, parseNum, readZip, readWorkbookSheets, makeZip, roundInterest, buildJournalCSV, lineKey, groupOf, round2, aliasTexts, isHeaderLine, defaultAccounts, fmtDate, parseDate, guessLedgerMap, buildLedger, matchLedgers, makeXlsx, calcInterest, mapJournal, mapFileName, mapDefaults, MAP_PRESETS, MAP_SOURCES, MAP_DATES, mapDate, mapNum, ageDays, ageBucket, AGE_BUCKETS, tbChecks, pdfToGrid, pdfLayout };
 // </ENGINE>

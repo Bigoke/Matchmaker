@@ -1,8 +1,9 @@
 package main
 
 import (
-	_ "embed"
+	"embed"
 	"fmt"
+	"io/fs"
 	"net"
 	"net/http"
 	"os"
@@ -14,6 +15,9 @@ import (
 
 //go:embed Matchmaker.html
 var page []byte
+
+//go:embed ocr
+var ocrFiles embed.FS
 
 var lastBeat int64
 
@@ -42,6 +46,8 @@ func main() {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Write(page)
 	})
+	sub, _ := fs.Sub(ocrFiles, "ocr")
+	mux.Handle("/ocr/", http.StripPrefix("/ocr/", http.FileServer(http.FS(sub))))
 	mux.HandleFunc("/beat", func(w http.ResponseWriter, r *http.Request) {
 		atomic.StoreInt64(&lastBeat, time.Now().Unix())
 		w.WriteHeader(204)
